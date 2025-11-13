@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         visControls Pro
 // @namespace    forgeren.tools.image-hover-controls
-// @version      1.9.7
+// @version      1.9.8
 // @description  Universal image tooling: zoom, rotate, move (with grid snap), reset, hide, save (single/ZIP), opacity, compare overlay, magnifier, hard mode targeting, viewport snapshot, background-image targeting, reveal hidden. Fixed icon display.
 // @author       Peter Polgari, peterp@forgeren.com
 // @match        *://*/*
@@ -373,6 +373,55 @@
     tooltip.style.transform='translateY(0)';
   }
   function hideTip(){ tooltip.style.opacity='0'; tooltip.style.transform='translateY(-4px)'; }
+  let tipHideTimer = null;
+
+  function paintThemePill(){
+    const dark = (APP.theme.toolBg === '#000');
+    const leftFill = dark ? '#000' : '#fff';
+    const rightFill = dark ? '#fff' : '#000';
+    const stroke = dark ? '#000' : '#000';
+    if (mini.theme){
+      mini.theme.innerHTML = `
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill="${leftFill}" stroke="${stroke}" stroke-width="1"/>
+          <path d="M12 3 A9 9 0 0 1 12 21 Z" fill="${rightFill}"/>
+        </svg>
+      `;
+      mini.theme.style.background = dark ? '#fff' : '#000';
+      mini.theme.style.color = dark ? '#000' : '#fff';
+      mini.theme.style.border = '1px solid ' + (dark ? '#000' : '#fff');
+    }
+  }
+  
+  function refreshThemeStyles(){
+    if (fabMain){
+      fabMain.style.background = APP.theme.widgetBg;
+      fabMain.style.color = APP.theme.widgetIcon;
+    }
+    document.querySelectorAll(`.${APP.id}-tool`).forEach(b=>{
+      b.style.background = APP.theme.toolBg;
+      b.style.color = APP.theme.toolIcon;
+    });
+    document.querySelectorAll(`.${APP.id}-mini`).forEach(b=>{
+      if (b.id !== `${APP.id}-mini-theme`){
+        const dark = (APP.theme.toolBg === '#000');
+        b.style.background = dark ? '#fff' : '#000';
+        b.style.color = dark ? '#000' : '#fff';
+        b.style.border = 'none';
+      }
+    });
+    if (tooltip){
+      const dark = (APP.theme.toolBg === '#000');
+      tooltip.style.background = dark ? 'rgba(17,24,39,.95)' : 'rgba(255,255,255,.95)';
+      tooltip.style.color = dark ? '#f9fafb' : '#111827';
+    }
+    if (typeof opPanel !== 'undefined' && opPanel){
+      const dark = (APP.theme.toolBg === '#000');
+      opPanel.style.background = dark ? 'rgba(0,0,0,.85)' : 'rgba(255,255,255,.95)';
+      opPanel.style.color = dark ? '#fff' : '#000';
+    }
+    paintThemePill();
+  }
 
   function toolButton(id, label, svgMarkup){
     const b = el('button',{
@@ -609,47 +658,20 @@
   btn.minus.addEventListener('click',()=>{ if(!currentTarget) return; const s=stateFor(currentTarget); s.scale=Math.max(T.minScale, s.scale-T.zoomStep); applyTransform(currentTarget); });
   btn.rotate.addEventListener('click',()=>{ if(!currentTarget) return; const s=stateFor(currentTarget); s.rotate=(s.rotate+APP.settings.rotateStep)%360; applyTransform(currentTarget); });
   btn.move.addEventListener('click', startMove);
-    btn.reset.addEventListener('click',()=>{
-        if(!currentTarget) return;
-        const s = stateFor(currentTarget);
-
-        Object.assign(s, {
-            scale:1, rotate:0, tx:0, ty:0,
-            placed:false, absTop:null, absLeft:null,
-            hidden:false, opacity:1, compare:false
-        });
-
-        if (currentTarget.tagName==='IMG'){
-            // drop portal and return to DOM flow
-            exitPortal(currentTarget);
-
-            // remove absolute positioning and fixed sizing
-            currentTarget.style.position = '';
-            currentTarget.style.top = '';
-            currentTarget.style.left = '';
-            currentTarget.style.zIndex = '';
-            currentTarget.style.width = '';
-            currentTarget.style.height = '';
-            currentTarget.style.maxWidth = '';
-            currentTarget.style.maxHeight = '';
-            currentTarget.style.visibility = '';
-
-            // restore original parent and order, then remove placeholder
-            if (s.origParent){
-                s.origParent.insertBefore(currentTarget, s.origNext || null);
-            }
-            if (s.placeholder){
-                try { s.placeholder.remove(); } catch {}
-            }
-            s.placeholder = null;
-            s.origParent = null;
-            s.origNext = null;
-            s.fixedW = null;
-            s.fixedH = null;
-        }
-
-        applyTransform(currentTarget);
-    });
+  btn.reset.addEventListener('click',()=>{
+    if(!currentTarget) return;
+    const s=stateFor(currentTarget);
+    Object.assign(s,{scale:1,rotate:0,tx:0,ty:0,placed:false,absTop:null,absLeft:null,hidden:false,opacity:1,compare:false});
+    if(currentTarget.tagName==='IMG'){
+      exitPortal(currentTarget);
+      currentTarget.style.position='';
+      currentTarget.style.top='';
+      currentTarget.style.left='';
+      currentTarget.style.zIndex='';
+    }
+    currentTarget.style.pointerEvents = '';
+    applyTransform(currentTarget);
+  });
   btn.hide.addEventListener('click',()=>{ if(!currentTarget) return; const s=stateFor(currentTarget); s.hidden=true; if(currentTarget.tagName==='IMG') exitPortal(currentTarget); currentTarget.style.display='hidden'; saveStateFor(currentTarget); hideOverlay(); announce(TXT().saved); });
 
   if (s.placed) currentTarget.style.pointerEvents = 'none';
@@ -842,6 +864,7 @@ function injectFabStyles(){
   const st=el('style');
   st.textContent = `
     @keyframes ${APP.id}-slowSpin { from {transform: rotate(0);} to {transform: rotate(360deg);} }
+    #${APP.id}-fab-main.spin .${APP.id}-rot-icon{ animation:${APP.id}-slowSpin 1.0s linear; }
     #${APP.id}-fab-wrap{position:fixed;top:50%;left:10px;transform:translateY(-50%);width:${T.widgetMiniSize}px;height:${T.widgetMiniSize}px;z-index:${APP.z.widget}}
     #${APP.id}-fab-main{width:${T.widgetMiniSize}px;height:${T.widgetMiniSize}px;border-radius:50%;border:2px solid ${APP.theme.powerOn};background:${APP.theme.widgetBg};color:${APP.theme.widgetIcon};display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
     #${APP.id}-fab-main.${APP.id}-off{border-color:${APP.theme.powerOff}}
@@ -874,7 +897,7 @@ fabMain = el('button',{id:`${APP.id}-fab-main`,type:'button',title:'Image tools 
   display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',overflow:'hidden'
 });
 
-fabMain.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" class="${APP.id}-rot-icon" style="width:100%;height:100%;opacity:.9;pointer-events:none;animation:${APP.id}-slowSpin 240s cubic-bezier(0.4,0,0.2,1) infinite;">
+fabMain.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true" class="${APP.id}-rot-icon" style="width:100%;height:100%;opacity:.9;pointer-events:none">
   <circle cx="17" cy="7" r="3" fill="currentColor"/>
   <path d="M2 18 L8 10 L12 14 L16 9 L22 18 Z" fill="currentColor"/>
 </svg>`;
@@ -918,28 +941,50 @@ function miniBtn(id, title, svgMarkup, textFallback){
     b.style.fontSize = '14px';
   }
 
-  b.addEventListener('mouseenter', () => showTip(title, b));
-  b.addEventListener('mouseleave', hideTip);
+  b.addEventListener('mouseenter', () => {
+    if (tipHideTimer){ clearTimeout(tipHideTimer); tipHideTimer = null; }
+    showTip(title, b);
+  });
+  b.addEventListener('mouseleave', () => {
+    if (tipHideTimer){ clearTimeout(tipHideTimer); }
+    tipHideTimer = setTimeout(hideTip, 300);
+  });
+
   return b;
 }
 
-mini.hard  = miniBtn('hard', TXT().hardMode, '<svg viewBox="0 0 24 24"><path d="M2 21l9-9 3 3-9 9H2v-3zm20-14l-2 2-5-5 2-2 5 5zM7 7l5-5 5 5-5 5L7 7z"/></svg>');
-mini.power = miniBtn('power', 'Power ON/OFF', '<svg viewBox="0 0 24 24"><path d="M13 3v10h-2V3h2zm-1 19a8 8 0 1 1 5.657-13.657l-1.414 1.414A6 6 0 1 0 12 20z"/></svg>');
+mini.hard  = miniBtn('hard', TXT().hardMode,  '<svg viewBox="0 0 24 24"><path d="M4 20l7-7m2 2l7-7M8 8l5-5 8 8-5 5-8-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
+mini.power = miniBtn('power', 'Power ON/OFF',  '<svg viewBox="0 0 24 24"><path d="M12 3v10M6.5 6.5a8 8 0 1 0 11 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
 mini.theme = miniBtn('theme', 'Flip widget theme (light/dark)', '');
 mini.theme.style.border='1px solid #000';
-mini.theme.style.background='conic-gradient(#000 0 180deg, transparent 180deg 360deg)';
+mini.theme.style.background='#fff';
+mini.theme.style.color = '#000';
 
-mini.grid   = miniBtn('grid',   TXT().grid,     '<svg viewBox="0 0 24 24"><path d="M3 3h18v18H3V3zm6 0v18m6-18v18M3 9h18M3 15h18"/></svg>');
-mini.mag    = miniBtn('mag',    TXT().magnifier,'<svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 1 0 4.9 14.4l4.35 4.35 1.41-1.41-4.35-4.35A8 8 0 0 0 10 2z"/></svg>');
+mini.grid   = miniBtn('grid', TXT().grid,  '<svg viewBox="0 0 24 24"><text x="6" y="17" font-size="16" font-family="system-ui,Segoe UI,Roboto,Inter,Arial" fill="currentColor">#</text></svg>');
+mini.mag    = miniBtn('mag', TXT().magnifier,  '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14.5 14.5 L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
 mini.snap   = miniBtn('snap',   TXT().snapshot, '<svg viewBox="0 0 24 24"><path d="M5 7h3l2-2h4l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm7 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>');
-mini.saveAll= miniBtn('saveall',TXT().saveAll,  '<svg viewBox="0 0 24 24"><path d="M12 2l4 4h-3v6H11V6H8l4-4zm8 8v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-8h2v8h12v-8h2z"/></svg>');
+mini.saveAll = miniBtn('saveall', TXT().saveAll,  '<svg viewBox="0 0 24 24"><path d="M7 3h10l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v6" stroke="currentColor" stroke-width="2"/><path d="M8 15h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
 mini.bg     = miniBtn('bg',     TXT().bgToggle, null,'BG');
-mini.reveal = miniBtn('reveal', TXT().reveal,   '<svg viewBox="0 0 24 24"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>');
+mini.store = miniBtn('store', 'Storage: none/session/local', '');
+mini.store.dataset.mode = String(APP.settings.storageMode);
+mini.storeUpdate = function(){
+  const mode = Number(mini.store.dataset.mode);
+  const label = mode===0 ? 'S:0' : mode===1 ? 'S:1' : 'S:2';
+  mini.store.textContent = label;
+};
+mini.storeUpdate();
 
-fabWrap.append(fabMain, mini.hard, mini.power, mini.theme, mini.grid, mini.mag, mini.snap, mini.saveAll, mini.bg, mini.reveal);
+fabWrap.append(fabMain, mini.hard, mini.power, mini.theme, mini.grid, mini.mag, mini.snap, mini.saveAll, mini.bg, mini.reveal, mini.store);
 document.documentElement.appendChild(fabWrap);
 
-fabMain.addEventListener('click', e=>{ e.stopPropagation(); fabWrap.classList.toggle(`${APP.id}-open`); });
+refreshThemeStyles();
+
+fabMain.addEventListener('click', e=>{
+  e.stopPropagation();
+  fabWrap.classList.toggle(`${APP.id}-open`);
+  fabMain.classList.add('spin');
+  setTimeout(()=>fabMain.classList.remove('spin'), 1100);
+});
 
 mini.power.addEventListener('click', ()=>{
   enabled=!enabled;
@@ -957,8 +1002,7 @@ mini.theme.addEventListener('click', ()=>{
   APP.theme.widgetIcon = (wi==='#fff') ? '#000' : '#fff';
   APP.theme.toolBg = (tb==='#000') ? '#fff' : '#000';
   APP.theme.toolIcon = (ti==='#fff') ? '#000' : '#fff';
-  fabMain.style.background = APP.theme.widgetBg; fabMain.style.color = APP.theme.widgetIcon;
-  document.querySelectorAll(`.${APP.id}-tool`).forEach(b=>{ b.style.background=APP.theme.toolBg; b.style.color=APP.theme.toolIcon; });
+  refreshThemeStyles();
 });
 
 mini.grid.addEventListener('click', cycleGrid);
@@ -1015,16 +1059,25 @@ mini.saveAll.addEventListener('click', async()=>{
 
 APP.__bg = true;
 mini.bg.addEventListener('click', ()=>{ mini.bg.textContent='BG'; APP.__bg = !APP.__bg; toast(APP.__bg?TXT().on:TXT().off); });
+mini.store.addEventListener('click', ()=>{
+  const next = (Number(mini.store.dataset.mode)+1) % 3;
+  mini.store.dataset.mode = String(next);
+  APP.settings.storageMode = next;
+  loadPersistence();
+  mini.storeUpdate();
+  toast(`Storage mode: ${next===0?'none':next===1?'session':'local'}`);
+});
 
-mini.reveal.addEventListener('click', ()=>{
-  let cnt = 0;
-  imgState.forEach((st, el)=>{
-    if (st.hidden){
-      st.hidden = false;
-      el.style.visibility = '';
+let cnt=0; imgState.forEach((s,el)=>{
+    if(s.hidden){
+      s.hidden=false;
+      el.style.display='';
+      el.style.visibility='';
+      el.style.pointerEvents='';
       cnt++;
     }
-  });
+ });
+
   toast(cnt ? `${TXT().reveal}: ${cnt}` : TXT().nothing);
 });
 
@@ -1091,13 +1144,19 @@ function safeName(u){ return (u||'').replace(/[^\w.\-]+/g,'_').slice(-120); }
   }
   function hardPick(ev){
     if(!hardArmed) return;
-    ev.stopImmediatePropagation(); ev.preventDefault();
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
     const elUnder = document.elementFromPoint(ev.clientX, ev.clientY);
     const cand = resolveCandidate(elUnder);
-    if (!cand.node){ clearHardHover(); return; }
+    if (!cand.node){
+      clearHardHover();
+      hardOff();
+      return;
+    }
     clearHardHover();
     showOverlay(cand.node);
     toast(TXT().picked);
+    hardOff();
   }
 
   /* =========================================================
