@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         visControls Pro
 // @namespace    forgeren.tools.image-hover-controls
-// @version      1.9.8
+// @version      1.9.9
 // @description  Universal image tooling: zoom, rotate, move (with grid snap), reset, hide, save (single/ZIP), opacity, compare overlay, magnifier, hard mode targeting, viewport snapshot, background-image targeting, reveal hidden. Fixed icon display.
 // @author       Peter Polgari, peterp@forgeren.com
 // @match        *://*/*
@@ -965,6 +965,7 @@ mini.mag    = miniBtn('mag', TXT().magnifier,  '<svg viewBox="0 0 24 24"><circle
 mini.snap   = miniBtn('snap',   TXT().snapshot, '<svg viewBox="0 0 24 24"><path d="M5 7h3l2-2h4l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm7 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>');
 mini.saveAll = miniBtn('saveall', TXT().saveAll,  '<svg viewBox="0 0 24 24"><path d="M7 3h10l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v6" stroke="currentColor" stroke-width="2"/><path d="M8 15h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
 mini.bg     = miniBtn('bg',     TXT().bgToggle, null,'BG');
+mini.reveal = miniBtn('reveal', TXT().reveal, '<svg viewBox="0 0 24 24"><path d="M12 5C7 5 2.73 8.11 1 12c1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" fill="none" stroke="currentColor" stroke-width="2"/></svg>');
 mini.store = miniBtn('store', 'Storage: none/session/local', '');
 mini.store.dataset.mode = String(APP.settings.storageMode);
 mini.storeUpdate = function(){
@@ -1068,16 +1069,16 @@ mini.store.addEventListener('click', ()=>{
   toast(`Storage mode: ${next===0?'none':next===1?'session':'local'}`);
 });
 
-let cnt=0; imgState.forEach((s,el)=>{
-    if(s.hidden){
-      s.hidden=false;
-      el.style.display='';
-      el.style.visibility='';
-      el.style.pointerEvents='';
+mini.reveal.addEventListener('click', ()=>{
+  let cnt = 0;
+  imgState.forEach((s, el)=>{
+    if (s.hidden){
+      s.hidden = false;
+      el.style.visibility = '';
+      el.style.pointerEvents = '';
       cnt++;
     }
- });
-
+  });
   toast(cnt ? `${TXT().reveal}: ${cnt}` : TXT().nothing);
 });
 
