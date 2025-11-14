@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         visControls Pro
 // @namespace    forgeren.tools.image-hover-controls
-// @version      1.9.9
+// @version      1.9.10
 // @description  Universal image tooling: zoom, rotate, move (with grid snap), reset, hide, save (single/ZIP), opacity, compare overlay, magnifier, hard mode targeting, viewport snapshot, background-image targeting, reveal hidden. Fixed icon display.
 // @author       Peter Polgari, peterp@forgeren.com
 // @match        *://*/*
@@ -15,8 +15,8 @@
 /*
  * Filename: image-hover-controls.pro.user.js
  * Author: Peter Polgari, peterp@forgeren.com
- * Version: 1.9.7
- * Created: 2025-11-13 (Europe/London)
+ * Version: 1.9.10
+ * Created: 2025-11-06
  * License: Non-commercial. No sharing, reuse, or distribution without written permission.
  *
  * 1.9.7 (icon display fix)
@@ -34,7 +34,7 @@
      ========================================================= */
   const APP = {
     id: 'ihc',
-    ver: '1.9.7',
+    ver: '1.9.10',
     z: {
       portal: 2147483645,   // below overlay+widget
       overlay: 2147483646,  // image tools
@@ -204,7 +204,7 @@
   let currentTarget = null;
   let activeForOpacity = null;
 
-  const imgState = new WeakMap();
+  const imgState = new Map();
   let storage = null, persisted = {}, pendingWrite = null;
 
   let overlay, btn = {};
@@ -464,8 +464,24 @@
       b.style.fontSize = `${Math.round(T.buttonSize * 0.6)}px`;
     }
 
+    b.addEventListener('mouseenter', () => {
+      if (tipHideTimer) {
+        clearTimeout(tipHideTimer);
+        tipHideTimer = null;
+      }
+      showTip(label, b);
+    });
+
+    b.addEventListener('mouseleave', () => {
+      if (tipHideTimer) {
+        clearTimeout(tipHideTimer);
+      }
+      tipHideTimer = setTimeout(hideTip, 300);
+    });
+
     return b;
   }
+
 
   const ICON = {
     plus:   '<svg viewBox="0 0 24 24"><path d="M19 11H13V5h-2v6H5v2h6v6h2v-6h6z"/></svg>',
@@ -645,11 +661,13 @@
         s.placed = true;
         s.absTop  = Math.round(scrollY + r.top);
         s.absLeft = Math.round(scrollX + r.left);
+        currentTarget.style.pointerEvents = 'none';
     }
 
     saveStateFor(currentTarget);
-    placeOverlay(currentTarget,true);
+    placeOverlay(currentTarget, true);
   }
+
 
   /* =========================================================
      BUTTON ACTIONS (unchanged behaviours)
@@ -672,10 +690,17 @@
     currentTarget.style.pointerEvents = '';
     applyTransform(currentTarget);
   });
-  btn.hide.addEventListener('click',()=>{ if(!currentTarget) return; const s=stateFor(currentTarget); s.hidden=true; if(currentTarget.tagName==='IMG') exitPortal(currentTarget); currentTarget.style.display='hidden'; saveStateFor(currentTarget); hideOverlay(); announce(TXT().saved); });
-
-  if (s.placed) currentTarget.style.pointerEvents = 'none';
-    
+  btn.hide.addEventListener('click', () => {
+    if (!currentTarget) return;
+    const s = stateFor(currentTarget);
+    s.hidden = true;
+    if (currentTarget.tagName === 'IMG') exitPortal(currentTarget);
+    currentTarget.style.visibility = 'hidden';
+    saveStateFor(currentTarget);
+    hideOverlay();
+    announce(TXT().saved);
+  });
+   
   let opPanel=null, opVal=null;
   function buildOpacityPanel(){
     opPanel = el('div',{id:`${APP.id}-op-pane`,role:'dialog','aria-label':TXT().opacityCtl},{position:'fixed',padding:'8px',background:'rgba(0,0,0,.85)',color:'#fff',borderRadius:'8px',zIndex:String(APP.z.widget),display:'none',pointerEvents:'auto'});
