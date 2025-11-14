@@ -63,7 +63,7 @@
           snapshot: 'Snapshot viewport (PNG)',
           saveAll: 'Save ALL images (ZIP)',
           bgToggle: 'Toggle background-image targeting',
-          reveal: 'Unhide all',
+          reveal: 'Reset all on page',
           on: 'ON',
           off: 'OFF',
           saved: 'Saved',
@@ -91,7 +91,7 @@
           snapshot: 'Ansicht speichern (PNG)',
           saveAll: 'Alle Bilder speichern (ZIP)',
           bgToggle: 'Hintergrundbilder ein/aus',
-          reveal: 'Alle einblenden',
+          reveal: 'Alles zurücksetzen',
           on: 'AN',
           off: 'AUS',
           saved: 'Gespeichert',
@@ -119,7 +119,7 @@
           snapshot: 'Nézet mentése (PNG)',
           saveAll: 'Összes kép mentése (ZIP)',
           bgToggle: 'Háttérképek be/ki',
-          reveal: 'Mind visszahoz',
+          reveal: 'Mindet alaphelyzetbe',
           on: 'BE',
           off: 'KI',
           saved: 'Mentve',
@@ -376,22 +376,20 @@
   let tipHideTimer = null;
 
   function paintThemePill(){
-    const dark = (APP.theme.toolBg === '#000');
-    const leftFill = dark ? '#000' : '#fff';
-    const rightFill = dark ? '#fff' : '#000';
-    const stroke = dark ? '#000' : '#000';
-    if (mini.theme){
-      mini.theme.innerHTML = `
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" fill="${leftFill}" stroke="${stroke}" stroke-width="1"/>
-          <path d="M12 3 A9 9 0 0 1 12 21 Z" fill="${rightFill}"/>
-        </svg>
-      `;
-      mini.theme.style.background = dark ? '#fff' : '#000';
-      mini.theme.style.color = dark ? '#000' : '#fff';
-      mini.theme.style.border = '1px solid ' + (dark ? '#000' : '#fff');
+      const dark = (APP.theme.toolBg === '#000');
+      const stroke = dark ? '#fff' : '#000';   // outline colour flips with theme
+      const fill   = dark ? '#fff' : '#000';   // filled half flips too
+  
+      if (mini.theme){
+        mini.theme.innerHTML = `
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <circle cx="12" cy="12" r="7" fill="none" stroke="${stroke}" stroke-width="0.5"/>
+            <path d="M12 5 A7 7 0 0 1 12 19 Z" fill="${fill}"/>
+          </svg>
+        `;
+      }
     }
-  }
+
   
   function refreshThemeStyles(){
     if (fabMain){
@@ -402,14 +400,13 @@
       b.style.background = APP.theme.toolBg;
       b.style.color = APP.theme.toolIcon;
     });
-    document.querySelectorAll(`.${APP.id}-mini`).forEach(b=>{
-      if (b.id !== `${APP.id}-mini-theme`){
-        const dark = (APP.theme.toolBg === '#000');
-        b.style.background = dark ? '#fff' : '#000';
-        b.style.color = dark ? '#000' : '#fff';
-        b.style.border = 'none';
-      }
+      document.querySelectorAll(`.${APP.id}-mini`).forEach(b=>{
+      const dark = (APP.theme.toolBg === '#000');
+      b.style.background = dark ? '#fff' : '#000';
+      b.style.color = dark ? '#000' : '#fff';
+      b.style.border = 'none';
     });
+
     if (tooltip){
       const dark = (APP.theme.toolBg === '#000');
       tooltip.style.background = dark ? 'rgba(17,24,39,.95)' : 'rgba(255,255,255,.95)';
@@ -586,7 +583,10 @@
     document.addEventListener('click', onMovePlace, true);
     announce(TXT().move);
   }
-  function activeGridStep(){ if(!gridCanvas) return 0; return Number(gridCanvas.dataset.spacing||0); }
+  function activeGridStep(){
+      if (!gridCanvas || gridCanvas.style.display !== 'block') return 0;
+      return Number(gridCanvas.dataset.spacing||0);
+    }
   function onMoveFollow(e){
     if(!dragging||!currentTarget) return;
     const s=stateFor(currentTarget);
@@ -903,6 +903,7 @@ function injectFabStyles(){
     #${APP.id}-mini-saveall{left:${(T.widgetMiniSize+6)*7}px}
     #${APP.id}-mini-bg{left:${(T.widgetMiniSize+6)*8}px}
     #${APP.id}-mini-reveal{left:${(T.widgetMiniSize+6)*9}px}
+    #${APP.id}-mini-store{left:${(T.widgetMiniSize+6)*10}px}
     #${APP.id}-fab-wrap.${APP.id}-open .${APP.id}-mini{opacity:1 !important;pointer-events:auto !important;transform:translateX(0) scale(1) !important}
     .${APP.id}-hard-armed #${APP.id}-mini-hard{outline:2px solid ${APP.theme.hardOn}}
     .${APP.id}-hard-hover{outline:2px dashed ${APP.theme.hardHover} !important; outline-offset:2px !important;}
@@ -981,11 +982,14 @@ function miniBtn(id, title, svgMarkup, textFallback){
 mini.hard  = miniBtn('hard', TXT().hardMode,  '<svg viewBox="0 0 24 24"><path d="M4 20l7-7m2 2l7-7M8 8l5-5 8 8-5 5-8-8z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 mini.power = miniBtn('power', 'Power ON/OFF',  '<svg viewBox="0 0 24 24"><path d="M12 3v10M6.5 6.5a8 8 0 1 0 11 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
 mini.theme = miniBtn('theme', 'Flip widget theme (light/dark)', '');
-mini.theme.style.border='1px solid #000';
-mini.theme.style.background='#fff';
-mini.theme.style.color = '#000';
 
-mini.grid   = miniBtn('grid', TXT().grid,  '<svg viewBox="0 0 24 24"><text x="6" y="17" font-size="16" font-family="system-ui,Segoe UI,Roboto,Inter,Arial" fill="currentColor">#</text></svg>');
+mini.grid   = miniBtn('grid', TXT().grid,
+  '<svg viewBox="0 0 24 24"><g stroke="currentColor" stroke-width="2" fill="none">' +
+  '<line x1="8" y1="6" x2="8" y2="18"/>' +
+  '<line x1="16" y1="6" x2="16" y2="18"/>' +
+  '<line x1="6" y1="8" x2="18" y2="8"/>' +
+  '<line x1="6" y1="16" x2="18" y2="16"/></g></svg>'
+);
 mini.mag    = miniBtn('mag', TXT().magnifier,  '<svg viewBox="0 0 24 24"><circle cx="10" cy="10" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14.5 14.5 L20 20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
 mini.snap   = miniBtn('snap',   TXT().snapshot, '<svg viewBox="0 0 24 24"><path d="M5 7h3l2-2h4l2 2h3a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2zm7 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10z"/></svg>');
 mini.saveAll = miniBtn('saveall', TXT().saveAll,  '<svg viewBox="0 0 24 24"><path d="M7 3h10l4 4v12a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3v6" stroke="currentColor" stroke-width="2"/><path d="M8 15h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>');
@@ -1097,15 +1101,60 @@ mini.store.addEventListener('click', ()=>{
 mini.reveal.addEventListener('click', ()=>{
   let cnt = 0;
   imgState.forEach((s, el)=>{
-    if (s.hidden){
-      s.hidden = false;
-      el.style.visibility = '';
-      el.style.pointerEvents = '';
-      cnt++;
+    // remove placeholder if present
+    if (s.placeholder){
+      if (s.placeholder.parentNode){
+        s.placeholder.parentNode.removeChild(s.placeholder);
+      }
+      s.placeholder = null;
     }
+
+    // move image back to original parent if we moved it to <body>
+    if (s.origParent && el.parentNode === document.body){
+      if (s.origNext && s.origNext.parentNode === s.origParent){
+        s.origParent.insertBefore(el, s.origNext);
+      } else {
+        s.origParent.appendChild(el);
+      }
+    }
+
+    // ensure portal is closed
+    exitPortal(el);
+
+    // clear styles we may have set
+    el.style.position = '';
+    el.style.top = '';
+    el.style.left = '';
+    el.style.width = '';
+    el.style.height = '';
+    el.style.maxWidth = '';
+    el.style.maxHeight = '';
+    el.style.transform = '';
+    el.style.opacity = '';
+    el.style.visibility = '';
+    el.style.pointerEvents = '';
+
+    // reset stored state
+    Object.assign(s, {
+      scale:1, rotate:0, tx:0, ty:0,
+      placed:false, absTop:null, absLeft:null,
+      hidden:false, opacity:1, compare:false,
+      portalActive:false, origHidden:false,
+      fixedW:null, fixedH:null
+    });
+
+    cnt++;
   });
-  toast(cnt ? `${TXT().reveal}: ${cnt}` : TXT().nothing);
+
+  // clear helpers and persistence
+  removeGhost();
+  disableMagnifier();
+  hideOverlay();
+  clearAllPersistence();
+
+  toast(cnt ? TXT().reveal : TXT().nothing);
 });
+
 
 async function addToZip(zip, url, base){
   try{
